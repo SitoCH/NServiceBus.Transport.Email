@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Net;
 using System.Net.Mail;
 using System.Threading.Tasks;
 using FluentEmail.Smtp;
@@ -25,7 +26,7 @@ namespace NServiceBus.Transport.Email
                 var serializedHeaders = HeaderSerializer.Serialize(operation.Message.Headers);
 
                 var email = FluentEmail.Core.Email
-                    .From(_settings.Get<string>("mail.sender"))
+                    .From(_settings.Get<string>(Constants.ENDPOINT_NAME))
                     .To(operation.Destination)
                     .Subject(operation.Message.MessageId)
                     .Body(serializedHeaders)
@@ -36,7 +37,12 @@ namespace NServiceBus.Transport.Email
                         ContentType = "application/octet-stream"
                     });
 
-                email.Sender = new SmtpSender(new SmtpClient { Host = _settings.Get<string>("mail.host"), Port = _settings.Get<int>("mail.port") });
+                email.Sender = new SmtpSender(new SmtpClient
+                {
+                    Host = _settings.Get<string>(Constants.SMTP_HOST),
+                    Port = _settings.Get<int>(Constants.SMTP_HOST_PORT),
+                    Credentials = new NetworkCredential(_settings.Get<string>(Constants.SMTP_USER), _settings.Get<string>(Constants.SMTP_PASSWORD))
+                });
                 email.Send();
             }
 
