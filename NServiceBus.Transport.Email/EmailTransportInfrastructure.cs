@@ -3,14 +3,22 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using NServiceBus.Performance.TimeToBeReceived;
 using NServiceBus.Routing;
+using NServiceBus.Settings;
 
 namespace NServiceBus.Transport.Email
 {
     public class EmailTransportInfrastructure : TransportInfrastructure
     {
+        private readonly SettingsHolder _settings;
+
+        public EmailTransportInfrastructure(SettingsHolder settings)
+        {
+            _settings = settings;
+        }
+        
         public override TransportReceiveInfrastructure ConfigureReceiveInfrastructure()
         {
-            return new TransportReceiveInfrastructure(() => new EmailTransportMessagePump(), () => new EmailTransportQueueCreator(), () => Task.FromResult(StartupCheckResult.Success));
+            return new TransportReceiveInfrastructure(() => new EmailTransportMessagePump(_settings.EndpointName()), () => new EmailTransportQueueCreator(_settings.EndpointName()), () => Task.FromResult(StartupCheckResult.Success));
         }
 
         public override TransportSendInfrastructure ConfigureSendInfrastructure()

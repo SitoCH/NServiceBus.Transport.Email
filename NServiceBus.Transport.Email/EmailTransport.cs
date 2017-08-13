@@ -6,7 +6,7 @@ namespace NServiceBus.Transport.Email
     {
         public override TransportInfrastructure Initialize(SettingsHolder settings, string connectionString)
         {
-            return new EmailTransportInfrastructure();
+            return new EmailTransportInfrastructure(settings);
         }
 
         public override bool RequiresConnectionString => false;
