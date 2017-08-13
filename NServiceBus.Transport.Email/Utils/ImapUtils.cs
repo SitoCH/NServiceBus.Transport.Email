@@ -14,6 +14,13 @@ namespace NServiceBus.Transport.Email.Utils
             return new ImapClient(imapBuilder["server"].ToString(), int.Parse(imapBuilder["port"].ToString()), imapBuilder["user"].ToString(), imapBuilder["password"].ToString(), AuthMethod.Login, true);
         }
 
+        public static string GetEmailUser()
+        {
+            var imapCS = ConfigurationManager.ConnectionStrings["NServiceBus/Transport/IMAP"];
+            var imapBuilder = new DbConnectionStringBuilder { ConnectionString = imapCS.ConnectionString };
+            return imapBuilder["user"].ToString();
+        }
+
         public static string GetCommittedMailboxName(string endpointName)
         {
             return string.Format("NSB.{0}.committed", endpointName);

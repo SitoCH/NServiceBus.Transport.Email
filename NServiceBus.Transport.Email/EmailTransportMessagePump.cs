@@ -114,7 +114,7 @@ namespace NServiceBus.Transport.Email
                 // Listen to new messages
                 imapClient.NewMessage += OnNewMessage;
                 // Process any messages that arrived when the endpoint was unactive
-                imapClient.Search(SearchCondition.Subject("NSB-MSG-"), imapClient.DefaultMailbox).ToList().ForEach(async m => await ProcessMessage(imapClient, m));
+                imapClient.Search(SearchCondition.Subject(string.Format("NSB-MSG-{0}", _endpointName)), imapClient.DefaultMailbox).ToList().ForEach(async m => await ProcessMessage(imapClient, m));
                 while (!_cancellationTokenSource.IsCancellationRequested)
                 {
                     await Task.Delay(250, _cancellationToken).ConfigureAwait(false);
@@ -131,7 +131,7 @@ namespace NServiceBus.Transport.Email
         private async Task ProcessMessage(IImapClient client, uint messageId)
         {
             var message = client.GetMessage(messageId, false, client.DefaultMailbox);
-            if (message.Subject.StartsWith("NSB-MSG-"))
+            if (message.Subject.StartsWith(string.Format("NSB-MSG-{0}", _endpointName)))
             {
                 await _concurrencyLimiter.WaitAsync(_cancellationToken).ConfigureAwait(false);
 
