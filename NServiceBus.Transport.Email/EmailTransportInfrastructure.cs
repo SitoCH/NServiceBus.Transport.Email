@@ -3,20 +3,11 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using NServiceBus.Performance.TimeToBeReceived;
 using NServiceBus.Routing;
-using NServiceBus.Settings;
-using NServiceBus.Transport.Email.Utils;
 
 namespace NServiceBus.Transport.Email
 {
     public class EmailTransportInfrastructure : TransportInfrastructure
     {
-        private readonly SettingsHolder _settings;
-
-        public EmailTransportInfrastructure(SettingsHolder settings)
-        {
-            _settings = settings;
-        }
-
         public override TransportReceiveInfrastructure ConfigureReceiveInfrastructure()
         {
             return new TransportReceiveInfrastructure(() => new EmailTransportMessagePump(), () => new EmailTransportQueueCreator(), () => Task.FromResult(StartupCheckResult.Success));
@@ -24,7 +15,7 @@ namespace NServiceBus.Transport.Email
 
         public override TransportSendInfrastructure ConfigureSendInfrastructure()
         {
-            return new TransportSendInfrastructure(() => new EmailDispatcher(_settings), () => Task.FromResult(StartupCheckResult.Success));
+            return new TransportSendInfrastructure(() => new EmailDispatcher(), () => Task.FromResult(StartupCheckResult.Success));
         }
 
         public override TransportSubscriptionInfrastructure ConfigureSubscriptionInfrastructure()
@@ -39,7 +30,7 @@ namespace NServiceBus.Transport.Email
 
         public override string ToTransportAddress(LogicalAddress logicalAddress)
         {
-            return _settings.Get<string>(Constants.ENDPOINT_NAME);
+            return logicalAddress.EndpointInstance.Endpoint;
         }
 
         public override IEnumerable<Type> DeliveryConstraints

@@ -9,4 +9,7 @@
     <PackageReference Include="NServiceBus" Version="6.3.4" />
     <PackageReference Include="S22.Imap" Version="3.6.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
 </Project>

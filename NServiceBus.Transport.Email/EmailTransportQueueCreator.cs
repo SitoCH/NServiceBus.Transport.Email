@@ -1,5 +1,5 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using NServiceBus.Transport.Email.Utils;
 
 namespace NServiceBus.Transport.Email
 {
@@ -7,8 +7,8 @@ namespace NServiceBus.Transport.Email
     {
         public Task CreateQueueIfNecessary(QueueBindings queueBindings, string identity)
         {
+            ImapUtils.InitMailbox();
             return Task.CompletedTask;
-            //throw new NotImplementedException();
         }
     }
 }
