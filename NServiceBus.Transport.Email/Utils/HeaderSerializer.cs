@@ -5,7 +5,7 @@ using System.Text;
 
 namespace NServiceBus.Transport.Email.Utils
 {
-    static class HeaderSerializer
+    internal static class HeaderSerializer
     {
         public static string Serialize(Dictionary<string, string> instance)
         {
@@ -26,7 +26,7 @@ namespace NServiceBus.Transport.Email.Utils
             }
         }
 
-        static DataContractJsonSerializer BuildSerializer()
+        private static DataContractJsonSerializer BuildSerializer()
         {
             var settings = new DataContractJsonSerializerSettings
             {

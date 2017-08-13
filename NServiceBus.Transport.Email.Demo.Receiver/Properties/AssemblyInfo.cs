@@ -4,11 +4,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("NServiceBus.Transport.Email.Demo.Shared")]
+[assembly: AssemblyTitle("NServiceBus.Transport.Email.Demo.Receiver")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("NServiceBus.Transport.Email.Demo.Shared")]
+[assembly: AssemblyProduct("NServiceBus.Transport.Email.Demo.Receiver")]
 [assembly: AssemblyCopyright("Simone Grignola © 2017")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("26c5c7b5-314c-41ca-a759-c89a3cae1c40")]
+[assembly: Guid("e73e28fa-14da-4fbd-9f8b-1b8622536333")]
 
 // Version information for an assembly consists of the following four values:
 //

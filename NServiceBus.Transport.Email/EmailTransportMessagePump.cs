@@ -102,7 +102,7 @@ namespace NServiceBus.Transport.Email
             }
         }
 
-        async Task InnerProcessMessages()
+        private async Task InnerProcessMessages()
         {
             using (var imapClient = ImapUtils.GetImapClient())
             {
