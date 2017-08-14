@@ -6,11 +6,11 @@ namespace NServiceBus.Transport.Email.Demo.Sender
 {
     public class MessageBHandler : IHandleMessages<MessageB>
     {
-        private static ILog log = LogManager.GetLogger<MessageBHandler>();
+        private static ILog _log = LogManager.GetLogger<MessageBHandler>();
 
         public Task Handle(MessageB message, IMessageHandlerContext context)
         {
-            log.Info("MessageB handled.");
+            _log.Info("MessageB handled.");
             return Task.CompletedTask;
         }
     }

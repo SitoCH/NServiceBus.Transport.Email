@@ -17,7 +17,6 @@ namespace NServiceBus.Transport.Email.Demo.Receiver
 
             var endpointConfiguration = new EndpointConfiguration("ReceiverEndpointName");
             endpointConfiguration.UseTransport<EmailTransport>();
-
             endpointConfiguration.UsePersistence<InMemoryPersistence>();
             endpointConfiguration.DisableFeature<TimeoutManager>();
 

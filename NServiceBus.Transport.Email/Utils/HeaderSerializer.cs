@@ -17,7 +17,7 @@ namespace NServiceBus.Transport.Email.Utils
             }
         }
 
-        public static Dictionary<string, string> DeSerialize(string json)
+        public static Dictionary<string, string> Deserialize(string json)
         {
             var serializer = BuildSerializer();
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))

@@ -6,12 +6,12 @@ namespace NServiceBus.Transport.Email.Demo.Receiver
 {
     public class MessageAHandler : IHandleMessages<MessageA>
     {
-        private static ILog log = LogManager.GetLogger<MessageAHandler>();
+        private static ILog _log = LogManager.GetLogger<MessageAHandler>();
 
         public Task Handle(MessageA message, IMessageHandlerContext context)
         {
-            log.Info("MessageA Handled");
-            log.Info("Replying with MessageB");
+            _log.Info("MessageA Handled");
+            _log.Info("Replying with MessageB");
             return context.Reply(new MessageB());
         }
     }

@@ -1,12 +1,16 @@
 ﻿using System.Configuration;
 using System.Data.Common;
 using System.Linq;
+using NServiceBus.Logging;
 using S22.Imap;
 
 namespace NServiceBus.Transport.Email.Utils
 {
-    public static class ImapUtils
+    public class ImapUtils
     {
+        private static readonly ILog _log = LogManager.GetLogger<ImapUtils>();
+
+
         public static IImapClient GetImapClient()
         {
             var imapCS = ConfigurationManager.ConnectionStrings["NServiceBus/Transport/IMAP"];
@@ -37,11 +41,18 @@ namespace NServiceBus.Transport.Email.Utils
             {
                 var availableMailboxes = imapClient.ListMailboxes().ToList();
 
-
-                if (!availableMailboxes.Contains(GetCommittedMailboxName(endpointName)))
-                    imapClient.CreateMailbox(GetCommittedMailboxName(endpointName));
-                if (!availableMailboxes.Contains(GetPendingMailboxName(endpointName)))
-                    imapClient.CreateMailbox(GetPendingMailboxName(endpointName));
+                var committedMailboxName = GetCommittedMailboxName(endpointName);
+                if (!availableMailboxes.Contains(committedMailboxName))
+                {
+                    imapClient.CreateMailbox(committedMailboxName);
+                    _log.Info(string.Format("Created new committed mailbox: {0}", committedMailboxName));
+                }
+                var pendingMailboxName = GetPendingMailboxName(endpointName);
+                if (!availableMailboxes.Contains(pendingMailboxName))
+                {
+                    imapClient.CreateMailbox(pendingMailboxName);
+                    _log.Info(string.Format("Created new pending mailbox: {0}", pendingMailboxName));
+                }
             }
         }
 

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Mail;
 using System.Threading;
 using System.Threading.Tasks;
 using NServiceBus.Extensibility;
@@ -16,7 +15,8 @@ namespace NServiceBus.Transport.Email
 {
     internal class EmailTransportMessagePump : IPushMessages
     {
-        private static readonly ILog log = LogManager.GetLogger<EmailTransportMessagePump>();
+        private static readonly ILog _log = LogManager.GetLogger<EmailTransportMessagePump>();
+        private static bool _started;
 
         private readonly string _endpointName;
 
@@ -34,18 +34,20 @@ namespace NServiceBus.Transport.Email
             _endpointName = endpointName;
         }
 
-
         public Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, CriticalError criticalError, PushSettings settings)
         {
             _onError = onError;
             _pipeline = onMessage;
-            //path = BaseDirectoryBuilder.BuildBasePath(settings.InputQueue);
             _purgeOnStartup = settings.PurgeOnStartup;
             return Task.CompletedTask;
         }
 
         public void Start(PushRuntimeSettings limitations)
         {
+            if (_started)
+                return;
+            _started = true;
+
             _runningReceiveTasks = new ConcurrentDictionary<Task, Task>();
             _concurrencyLimiter = new SemaphoreSlim(limitations.MaxConcurrency);
             _cancellationTokenSource = new CancellationTokenSource();
@@ -73,7 +75,7 @@ namespace NServiceBus.Transport.Email
 
             if (finishedTask.Equals(timeoutTask))
             {
-                log.Error("The message pump failed to stop with in the time allowed(30s).");
+                _log.Error("The message pump failed to stop with in the time allowed(30s).");
             }
 
             _concurrencyLimiter.Dispose();
@@ -93,13 +95,14 @@ namespace NServiceBus.Transport.Email
             }
             catch (Exception ex)
             {
-                log.Error("Email message pump failed.", ex);
+                _log.Error("Email message pump failed.", ex);
             }
 
             if (!_cancellationToken.IsCancellationRequested)
             {
                 await ProcessMessages().ConfigureAwait(false);
             }
+
         }
 
         private async Task InnerProcessMessages()
@@ -108,7 +111,7 @@ namespace NServiceBus.Transport.Email
             {
                 if (!imapClient.Supports("IDLE"))
                 {
-                    log.Error("Server does not support IMAP IDLE");
+                    _log.Error("Server does not support IMAP IDLE");
                     return;
                 }
                 // Listen to new messages
@@ -117,29 +120,30 @@ namespace NServiceBus.Transport.Email
                 imapClient.Search(SearchCondition.Subject(string.Format("NSB-MSG-{0}", _endpointName)), imapClient.DefaultMailbox).ToList().ForEach(async m => await ProcessMessage(imapClient, m));
                 while (!_cancellationTokenSource.IsCancellationRequested)
                 {
-                    await Task.Delay(250, _cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(750, _cancellationToken).ConfigureAwait(false);
                 }
             }
         }
 
         private async void OnNewMessage(object sender, IdleMessageEventArgs e)
         {
-            log.Debug(string.Format("A new message has been received. Message has UID: {0}", e.MessageUID));
+            _log.Info("IDLE notification from IMAP server.");
             await ProcessMessage(e.Client, e.MessageUID);
         }
 
         private async Task ProcessMessage(IImapClient client, uint messageId)
         {
-            var message = client.GetMessage(messageId, false, client.DefaultMailbox);
-            if (message.Subject.StartsWith(string.Format("NSB-MSG-{0}", _endpointName)))
+            var messageHeaders = client.GetMessage(messageId, FetchOptions.HeadersOnly, false, client.DefaultMailbox);
+            if (messageHeaders.Subject.StartsWith(string.Format("NSB-MSG-{0}", _endpointName)))
             {
+                _log.Info(string.Format("A new message has been received. Message has UID: {0}", messageId));
                 await _concurrencyLimiter.WaitAsync(_cancellationToken).ConfigureAwait(false);
 
                 var task = Task.Run(async () =>
                 {
                     try
                     {
-                        await ProcessMessageWithTransaction(client, messageId, message).ConfigureAwait(false);
+                        await ProcessMessageWithTransaction(client, messageId).ConfigureAwait(false);
                     }
                     finally
                     {
@@ -158,13 +162,15 @@ namespace NServiceBus.Transport.Email
             }
         }
 
-        private async Task ProcessMessageWithTransaction(IImapClient client, uint messageId, MailMessage message)
+        private async Task ProcessMessageWithTransaction(IImapClient client, uint messageId)
         {
             using (var transaction = new MailBasedTransaction(client, _endpointName))
             {
                 transaction.BeginTransaction(messageId);
 
-                var headers = HeaderSerializer.DeSerialize(message.Body);
+                var message = client.GetMessage(messageId, false, ImapUtils.GetPendingMailboxName(_endpointName));
+
+                var headers = HeaderSerializer.Deserialize(message.Body);
 
                 if (headers.TryGetValue(Headers.TimeToBeReceived, out string ttbrString))
                 {
