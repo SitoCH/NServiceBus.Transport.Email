@@ -25,14 +25,14 @@ namespace NServiceBus.Transport.Email.Utils
             return imapBuilder["user"].ToString();
         }
 
-        public static string GetCommittedMailboxName(string endpointName)
+        public static string GetErrorMailboxName(string endpointName)
         {
-            return string.Format("NSB.{0}.committed", endpointName);
+            return $"NSB.{endpointName}.error";
         }
 
         public static string GetPendingMailboxName(string endpointName)
         {
-            return string.Format("NSB.{0}.pending", endpointName);
+            return $"NSB.{endpointName}.pending";
         }
 
         public static void InitMailboxes(string endpointName)
@@ -41,27 +41,27 @@ namespace NServiceBus.Transport.Email.Utils
             {
                 var availableMailboxes = imapClient.ListMailboxes().ToList();
 
-                var committedMailboxName = GetCommittedMailboxName(endpointName);
-                if (!availableMailboxes.Contains(committedMailboxName))
+                var errorMailboxName = GetErrorMailboxName(endpointName);
+                if (!availableMailboxes.Contains(errorMailboxName))
                 {
-                    imapClient.CreateMailbox(committedMailboxName);
-                    _log.Info(string.Format("Created new committed mailbox: {0}", committedMailboxName));
+                    imapClient.CreateMailbox(errorMailboxName);
+                    _log.Info($"Created new error mailbox: {errorMailboxName}");
                 }
                 var pendingMailboxName = GetPendingMailboxName(endpointName);
                 if (!availableMailboxes.Contains(pendingMailboxName))
                 {
                     imapClient.CreateMailbox(pendingMailboxName);
-                    _log.Info(string.Format("Created new pending mailbox: {0}", pendingMailboxName));
+                    _log.Info($"Created new pending mailbox: {pendingMailboxName}");
                 }
             }
         }
 
         public static void PurgeMailboxes(string endpointName)
         {
-            using (var imapClient = GetImapClient())
+            /*using (var imapClient = GetImapClient())
             {
                 PurgeMailbox(imapClient, GetCommittedMailboxName(endpointName));
-            }
+            }*/
         }
 
         private static void PurgeMailbox(IImapClient imapClient, string mailbox)

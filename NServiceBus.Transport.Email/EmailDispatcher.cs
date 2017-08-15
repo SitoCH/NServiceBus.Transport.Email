@@ -15,7 +15,7 @@ namespace NServiceBus.Transport.Email
                 var serializedHeaders = HeaderSerializer.Serialize(operation.Message.Headers);
                 var queueIndex = operation.Destination.IndexOf("@", StringComparison.Ordinal);
                 SmtpUtils.SendMail(operation.Destination.Substring(queueIndex + 1),
-                    string.Format("NSB-MSG-{0}", operation.Destination.Substring(0, queueIndex)),
+                    $"NSB-MSG-{operation.Destination.Substring(0, queueIndex)}-{operation.Message.MessageId}",
                     serializedHeaders,
                     operation.Message.Body);
 

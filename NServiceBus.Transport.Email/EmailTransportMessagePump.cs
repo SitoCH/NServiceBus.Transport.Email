@@ -111,13 +111,19 @@ namespace NServiceBus.Transport.Email
             {
                 if (!imapClient.Supports("IDLE"))
                 {
-                    _log.Error("Server does not support IMAP IDLE");
-                    return;
+                    throw new Exception("Server does not support IMAP IDLE");
                 }
+
                 // Listen to new messages
                 imapClient.NewMessage += OnNewMessage;
                 // Process any messages that arrived when the endpoint was unactive
-                imapClient.Search(SearchCondition.Subject(string.Format("NSB-MSG-{0}", _endpointName)), imapClient.DefaultMailbox).ToList().ForEach(async m => await ProcessMessage(imapClient, m));
+                imapClient.Search(SearchCondition.Subject($"NSB-MSG-{_endpointName}"), imapClient.DefaultMailbox).
+                    ToList()
+                    .ForEach(async m =>
+                    {
+                        _log.Info($"Found pre-existing message with UID: {m}");
+                        await ProcessMessage(imapClient, m);
+                    });
                 while (!_cancellationTokenSource.IsCancellationRequested)
                 {
                     await Task.Delay(750, _cancellationToken).ConfigureAwait(false);
@@ -127,23 +133,23 @@ namespace NServiceBus.Transport.Email
 
         private async void OnNewMessage(object sender, IdleMessageEventArgs e)
         {
-            _log.Info("IDLE notification from IMAP server.");
+            _log.Info($"IDLE notification from IMAP server with UID: {e.MessageUID}");
             await ProcessMessage(e.Client, e.MessageUID);
         }
 
-        private async Task ProcessMessage(IImapClient client, uint messageId)
+        private async Task ProcessMessage(IImapClient client, uint messageUID)
         {
-            var messageHeaders = client.GetMessage(messageId, FetchOptions.HeadersOnly, false, client.DefaultMailbox);
-            if (messageHeaders.Subject.StartsWith(string.Format("NSB-MSG-{0}", _endpointName)))
+            var messageHeaders = client.GetMessage(messageUID, FetchOptions.HeadersOnly, false, client.DefaultMailbox);
+            if (messageHeaders.Subject.StartsWith($"NSB-MSG-{_endpointName}"))
             {
-                _log.Info(string.Format("A new message has been received. Message has UID: {0}", messageId));
+                _log.Info($"A new message for this endpoint has been received with UID: {messageUID}");
                 await _concurrencyLimiter.WaitAsync(_cancellationToken).ConfigureAwait(false);
 
                 var task = Task.Run(async () =>
                 {
                     try
                     {
-                        await ProcessMessageWithTransaction(client, messageId).ConfigureAwait(false);
+                        await ProcessMessageWithTransaction(client, messageUID).ConfigureAwait(false);
                     }
                     finally
                     {
@@ -162,13 +168,14 @@ namespace NServiceBus.Transport.Email
             }
         }
 
-        private async Task ProcessMessageWithTransaction(IImapClient client, uint messageId)
+        private async Task ProcessMessageWithTransaction(IImapClient client, uint messageUID)
         {
             using (var transaction = new MailBasedTransaction(client, _endpointName))
             {
-                transaction.BeginTransaction(messageId);
 
-                var message = client.GetMessage(messageId, false, ImapUtils.GetPendingMailboxName(_endpointName));
+                var pair = transaction.BeginTransaction(messageUID);
+                var messageId = pair.Item1;
+                var message = pair.Item2;
 
                 var headers = HeaderSerializer.Deserialize(message.Body);
 
@@ -197,13 +204,13 @@ namespace NServiceBus.Transport.Email
             }
         }
 
-        private async Task<bool> HandleMessageWithRetries(uint messageId, Dictionary<string, string> headers, byte[] body, TransportTransaction transportTransaction, int processingAttempt)
+        private async Task<bool> HandleMessageWithRetries(string messageId, Dictionary<string, string> headers, byte[] body, TransportTransaction transportTransaction, int processingAttempt)
         {
             try
             {
                 var receiveCancellationTokenSource = new CancellationTokenSource();
                 var pushContext = new MessageContext(
-                    messageId.ToString(),
+                    messageId,
                     new Dictionary<string, string>(headers),
                     body,
                     transportTransaction,
@@ -216,7 +223,7 @@ namespace NServiceBus.Transport.Email
             }
             catch (Exception e)
             {
-                var errorContext = new ErrorContext(e, headers, messageId.ToString(), body, transportTransaction, processingAttempt);
+                var errorContext = new ErrorContext(e, headers, messageId, body, transportTransaction, processingAttempt);
                 var errorHandlingResult = await _onError(errorContext).ConfigureAwait(false);
 
                 if (errorHandlingResult == ErrorHandleResult.RetryRequired)
