@@ -39,7 +39,7 @@ namespace NServiceBus.Transport.Email
 
         public override string ToTransportAddress(LogicalAddress logicalAddress)
         {
-            return $"{logicalAddress.EndpointInstance.Endpoint}@{ImapUtils.GetEmailUser()}";
+            return string.IsNullOrEmpty(logicalAddress.Qualifier) ? $"{logicalAddress.EndpointInstance.Endpoint}@{ImapUtils.GetEmailUser()}" : $"{logicalAddress.EndpointInstance.Endpoint}.{logicalAddress.Qualifier}@{ImapUtils.GetEmailUser()}";
         }
 
         public override IEnumerable<Type> DeliveryConstraints
