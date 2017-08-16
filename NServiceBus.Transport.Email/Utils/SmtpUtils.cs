@@ -1,10 +1,8 @@
 ﻿using System.Configuration;
 using System.Data.Common;
 using System.IO;
-using System.Net;
-using System.Net.Mail;
-using FluentEmail.Smtp;
-using Attachment = FluentEmail.Core.Models.Attachment;
+using MailKit.Net.Smtp;
+using MimeKit;
 
 namespace NServiceBus.Transport.Email.Utils
 {
@@ -18,25 +16,33 @@ namespace NServiceBus.Transport.Email.Utils
             var smtpCS = ConfigurationManager.ConnectionStrings["NServiceBus/Transport/SMTP"];
             var smtpBuilder = new DbConnectionStringBuilder { ConnectionString = smtpCS.ConnectionString };
 
-            var email = FluentEmail.Core.Email
-                .From(imapBuilder["user"].ToString())
-                .To(to)
-                .Subject(subject)
-                .Body(body)
-                .Attach(new Attachment
-                {
-                    Data = new MemoryStream(attachment),
-                    Filename = "body",
-                    ContentType = "application/octet-stream"
-                });
-
-            email.Sender = new SmtpSender(new SmtpClient
+            var message = new MimeMessage { Subject = subject };
+            message.From.Add(new MailboxAddress(imapBuilder["user"].ToString()));
+            message.To.Add(new MailboxAddress(to));
+            var messageBody = new TextPart("plain") { Text = body };
+            var messageAttachment = new MimePart("application", "octet-stream")
             {
-                Host = smtpBuilder["server"].ToString(),
-                Port = int.Parse(smtpBuilder["port"].ToString()),
-                Credentials = new NetworkCredential(smtpBuilder["user"].ToString(), smtpBuilder["password"].ToString())
-            });
-            email.Send();
+                ContentObject = new ContentObject(new MemoryStream(attachment)),
+                ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                ContentTransferEncoding = ContentEncoding.Base64,
+                FileName = "native-message"
+            };
+
+            var multipart = new Multipart("mixed") { messageBody, messageAttachment };
+            message.Body = multipart;
+
+            using (var client = new SmtpClient())
+            {
+                // For demo-purposes, accept all SSL certificates (in case the server supports STARTTLS)
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+                client.Connect(smtpBuilder["server"].ToString(), int.Parse(smtpBuilder["port"].ToString()), false);
+                client.AuthenticationMechanisms.Remove("XOAUTH2");
+                client.Authenticate(smtpBuilder["user"].ToString(), smtpBuilder["password"].ToString());
+
+                client.Send(message);
+                client.Disconnect(true);
+            }
         }
     }
 }

@@ -1,8 +1,10 @@
 ﻿using System.Configuration;
 using System.Data.Common;
 using System.Linq;
+using MailKit;
+using MailKit.Net.Imap;
+using MailKit.Search;
 using NServiceBus.Logging;
-using S22.Imap;
 
 namespace NServiceBus.Transport.Email.Utils
 {
@@ -11,11 +13,19 @@ namespace NServiceBus.Transport.Email.Utils
         private static readonly ILog _log = LogManager.GetLogger<ImapUtils>();
 
 
-        public static IImapClient GetImapClient()
+        public static ImapClient GetImapClient()
         {
             var imapCS = ConfigurationManager.ConnectionStrings["NServiceBus/Transport/IMAP"];
             var imapBuilder = new DbConnectionStringBuilder { ConnectionString = imapCS.ConnectionString };
-            return new ImapClient(imapBuilder["server"].ToString(), int.Parse(imapBuilder["port"].ToString()), imapBuilder["user"].ToString(), imapBuilder["password"].ToString(), AuthMethod.Login, true);
+
+            // For demo-purposes, accept all SSL certificates (in case the server supports STARTTLS)
+            var client = new ImapClient { ServerCertificateValidationCallback = (s, c, h, e) => true };
+
+            client.Connect(imapBuilder["server"].ToString(), int.Parse(imapBuilder["port"].ToString()), false);
+            client.AuthenticationMechanisms.Remove("XOAUTH2");
+            client.Authenticate(imapBuilder["user"].ToString(), imapBuilder["password"].ToString());
+
+            return client;
         }
 
         public static string GetEmailUser()
@@ -37,38 +47,41 @@ namespace NServiceBus.Transport.Email.Utils
 
         public static void InitMailboxes(string endpointName)
         {
-            using (var imapClient = GetImapClient())
+            using (var client = GetImapClient())
             {
-                var availableMailboxes = imapClient.ListMailboxes().ToList();
+                var availableMailboxes = client.GetFolders(client.PersonalNamespaces[0]);
+                var toplevel = client.GetFolder(client.PersonalNamespaces[0]);
 
                 var errorMailboxName = GetErrorMailboxName(endpointName);
-                if (!availableMailboxes.Contains(errorMailboxName))
+                if (availableMailboxes.All(x => x.Name != errorMailboxName))
                 {
-                    imapClient.CreateMailbox(errorMailboxName);
+                    toplevel.Create(errorMailboxName, true);
                     _log.Info($"Created new error mailbox: {errorMailboxName}");
                 }
                 var pendingMailboxName = GetPendingMailboxName(endpointName);
-                if (!availableMailboxes.Contains(pendingMailboxName))
+                if (availableMailboxes.All(x => x.Name != pendingMailboxName))
                 {
-                    imapClient.CreateMailbox(pendingMailboxName);
+                    toplevel.Create(pendingMailboxName, true);
                     _log.Info($"Created new pending mailbox: {pendingMailboxName}");
                 }
+
+                client.Disconnect(true);
             }
         }
 
         public static void PurgeMailboxes(string endpointName)
         {
-            /*using (var imapClient = GetImapClient())
+            using (var client = GetImapClient())
             {
-                PurgeMailbox(imapClient, GetCommittedMailboxName(endpointName));
-            }*/
-        }
-
-        private static void PurgeMailbox(IImapClient imapClient, string mailbox)
-        {
-            foreach (var message in imapClient.Search(SearchCondition.All(), mailbox))
-            {
-                imapClient.DeleteMessage(message, mailbox);
+                var toplevel = client.GetFolder(client.PersonalNamespaces[0]);
+                var pendingMailbox = toplevel.GetSubfolder(GetPendingMailboxName(endpointName));
+                if (pendingMailbox.Exists)
+                {
+                    var uids = pendingMailbox.Search(SearchQuery.All);
+                    pendingMailbox.AddFlags(uids, MessageFlags.Deleted, true);
+                    pendingMailbox.Expunge();
+                }
+                client.Disconnect(true);
             }
         }
     }
