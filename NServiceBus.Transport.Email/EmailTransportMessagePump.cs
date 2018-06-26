@@ -9,8 +9,10 @@ using System.Threading.Tasks;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
+using MimeKit;
 using NServiceBus.Extensibility;
 using NServiceBus.Logging;
+using NServiceBus.Settings;
 using NServiceBus.Transport.Email.Utils;
 
 namespace NServiceBus.Transport.Email
@@ -21,19 +23,18 @@ namespace NServiceBus.Transport.Email
         private static bool _started;
 
         private readonly string _endpointName;
-
-        private CancellationToken _cancellationToken;
+        private readonly SettingsHolder _settings;
+        private CancellationTokenSource _timeoutTokenSource;
         private CancellationTokenSource _cancellationTokenSource;
-        private SemaphoreSlim _concurrencyLimiter;
-        private Task _messagePumpTask;
         private Func<ErrorContext, Task<ErrorHandleResult>> _onError;
         private Func<MessageContext, Task> _pipeline;
-        private bool _purgeOnStartup;
-        private ConcurrentDictionary<Task, Task> _runningReceiveTasks;
 
-        public EmailTransportMessagePump(string endpointName)
+        private bool _purgeOnStartup;
+
+        public EmailTransportMessagePump(SettingsHolder settings)
         {
-            _endpointName = endpointName;
+            _endpointName = settings.EndpointName();
+            _settings = settings;
         }
 
         public Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, CriticalError criticalError, PushSettings settings)
@@ -50,163 +51,132 @@ namespace NServiceBus.Transport.Email
                 return;
             _started = true;
 
-            _runningReceiveTasks = new ConcurrentDictionary<Task, Task>();
-            _concurrencyLimiter = new SemaphoreSlim(limitations.MaxConcurrency);
-            _cancellationTokenSource = new CancellationTokenSource();
-
-            _cancellationToken = _cancellationTokenSource.Token;
-
-            if (_purgeOnStartup)
+            Task.Factory.StartNew(() =>
             {
-                ImapUtils.PurgeMailboxes(_endpointName);
-            }
+                using (var client = _settings.GetImapClient())
+                {
+                    ImapUtils.InitMailboxes(client, _settings.EndpointName());
 
-            _messagePumpTask = Task.Factory.StartNew(ProcessMessages, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
-        }
+                    client.Inbox.Open(FolderAccess.ReadWrite);
 
-        public async Task Stop()
-        {
-            _cancellationTokenSource.Cancel();
 
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30), _cancellationTokenSource.Token);
-            var allTasks = _runningReceiveTasks.Values.Concat(new[]
-            {
-                _messagePumpTask
+                    if (_purgeOnStartup)
+                    {
+                        ImapUtils.PurgeMailboxes(client, _endpointName);
+                    }
+
+                    var query = SearchQuery.SubjectContains($"NSB-MSG-{_endpointName}-");
+                    // Process any messages that arrived when the endpoint was unactive
+                    foreach (var m in client.Inbox.Search(query))
+                    {
+                        _log.Info($"Found pre-existing message with UID: {m}.");
+                        ProcessMessageWithTransaction(client, m);
+                    }
+
+                    // Listen to new messages
+                    void CheckForNewMessages(object o, EventArgs args)
+                    {
+                        _log.Debug("Mailbox count changed.");
+                        _timeoutTokenSource.Cancel();
+                    }
+
+                    client.Inbox.CountChanged += CheckForNewMessages;
+
+                    _cancellationTokenSource = new CancellationTokenSource();
+
+                    while (!_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        _timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                        using (_timeoutTokenSource)
+                        {
+                            try
+                            {
+                                if (client.Capabilities.HasFlag(ImapCapabilities.Idle))
+                                {
+                                    _log.Info("Waiting for IDLE from IMAP server.");
+                                    client.Idle(_timeoutTokenSource.Token, _cancellationTokenSource.Token);
+                                }
+                                else
+                                {
+                                    _log.Info("Waiting for new messages...");
+                                    client.NoOp(_cancellationTokenSource.Token);
+                                    WaitHandle.WaitAny(new[] {_timeoutTokenSource.Token.WaitHandle, _cancellationTokenSource.Token.WaitHandle});
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                break;
+                            }
+                            catch (ImapProtocolException)
+                            {
+                                break;
+                            }
+                            catch (ImapCommandException)
+                            {
+                                break;
+                            }
+
+                            foreach (var m in client.Inbox.Search(query))
+                            {
+                                _log.Info($"Processing message with UID: {m}.");
+                                ProcessMessageWithTransaction(client, m);
+                            }
+                        }
+                    }
+                }
             });
-            var finishedTask = await Task.WhenAny(Task.WhenAll(allTasks), timeoutTask).ConfigureAwait(false);
-
-            if (finishedTask.Equals(timeoutTask))
-            {
-                _log.Error("The message pump failed to stop with in the time allowed(30s).");
-            }
-
-            _concurrencyLimiter.Dispose();
-            _runningReceiveTasks.Clear();
         }
 
-        [DebuggerNonUserCode]
-        private async Task ProcessMessages()
+        public Task Stop()
         {
             try
             {
-                await InnerProcessMessages().ConfigureAwait(false);
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
             }
             catch (OperationCanceledException)
             {
-                // For graceful shutdown purposes
-            }
-            catch (Exception ex)
-            {
-                _log.Error("Email message pump failed.", ex);
             }
 
-            if (!_cancellationToken.IsCancellationRequested)
-            {
-                await ProcessMessages().ConfigureAwait(false);
-            }
-
+            return Task.CompletedTask;
         }
 
-        private async Task InnerProcessMessages()
+        private void ProcessMessageWithTransaction(ImapClient client, UniqueId messageId)
         {
-            using (var client = ImapUtils.GetImapClient())
+            var transaction = new MailBasedTransaction(client, _endpointName);
+            var pair = transaction.BeginTransaction(messageId);
+            var messageNativeId = pair.Item1;
+            var message = pair.Item2;
+
+            var headers = HeaderSerializer.Deserialize(message.TextBody);
+
+            if (headers.TryGetValue(Headers.TimeToBeReceived, out string ttbrString))
             {
-                if (!client.Capabilities.HasFlag(ImapCapabilities.Idle))
+                var ttbr = TimeSpan.Parse(ttbrString);
+                var sentTime = message.Date;
+                if (sentTime + ttbr < DateTime.UtcNow)
                 {
-                    throw new Exception("Server does not support IMAP IDLE");
-                }
-
-                var query = SearchQuery.SubjectContains($"NSB-MSG-{_endpointName}-");
-
-                // Listen to new messages
-                client.Inbox.MessagesArrived += async (o, args) =>
-                {
-                    _log.Info("IDLE notification from IMAP server.");
-                    foreach (var m in client.Inbox.Search(query))
-                    {
-                        _log.Info($"Received message with UID: {m}.");
-                        await ProcessMessage(client, m);
-                    }
-                };
-                // Process any messages that arrived when the endpoint was unactive
-                foreach (var m in client.Inbox.Search(query))
-                {
-                    _log.Info($"Found pre-existing message with UID: {m}.");
-                    await ProcessMessage(client, m);
-                }
-
-                while (!_cancellationTokenSource.IsCancellationRequested)
-                {
-                    await Task.Delay(750, _cancellationToken).ConfigureAwait(false);
-                }
-
-                // ReSharper disable once MethodSupportsCancellation
-                await client.DisconnectAsync(true);
-            }
-        }
-
-        private async Task ProcessMessage(ImapClient client, UniqueId messageId)
-        {
-            await _concurrencyLimiter.WaitAsync(_cancellationToken).ConfigureAwait(false);
-
-            var task = Task.Run(async () =>
-            {
-                try
-                {
-                    await ProcessMessageWithTransaction(client, messageId).ConfigureAwait(false);
-                }
-                finally
-                {
-                    _concurrencyLimiter.Release();
-                }
-            }, _cancellationToken);
-
-            await task.ContinueWith(t =>
-                {
-                    Task toBeRemoved;
-                    _runningReceiveTasks.TryRemove(t, out toBeRemoved);
-                },
-                TaskContinuationOptions.ExecuteSynchronously); //.Ignore();
-
-            await _runningReceiveTasks.AddOrUpdate(task, task, (k, v) => task); //.Ignore();
-        }
-
-        private async Task ProcessMessageWithTransaction(ImapClient client, UniqueId messageId)
-        {
-            using (var transaction = new MailBasedTransaction(client, _endpointName))
-            {
-                var pair = transaction.BeginTransaction(messageId);
-                var messageNativeId = pair.Item1;
-                var message = pair.Item2;
-
-                var headers = HeaderSerializer.Deserialize(message.TextBody);
-
-                if (headers.TryGetValue(Headers.TimeToBeReceived, out string ttbrString))
-                {
-                    var ttbr = TimeSpan.Parse(ttbrString);
-                    var sentTime = message.Date;
-                    if (sentTime + ttbr < DateTime.UtcNow)
-                    {
-                        return;
-                    }
-                }
-
-                var ms = new MemoryStream();
-                message.Attachments.First().WriteTo(ms);
-                var body = ms.ToArray();
-                var transportTransaction = new TransportTransaction();
-                transportTransaction.Set(transaction);
-
-                var shouldCommit = await HandleMessageWithRetries(messageNativeId, headers, body, transportTransaction, 1).ConfigureAwait(false);
-
-                if (shouldCommit)
-                {
-                    transaction.Commit();
+                    return;
                 }
             }
+
+            var ms = new MemoryStream();
+            ((MimePart) message.Attachments.First()).ContentObject.DecodeTo(ms);
+            var body = ms.ToArray();
+            var transportTransaction = new TransportTransaction();
+            transportTransaction.Set(transaction);
+
+            var shouldCommit = HandleMessageWithRetries(messageNativeId, headers, body, transportTransaction, 1);
+
+            if (shouldCommit)
+            {
+                transaction.Commit();
+            }
+
+            transaction.Finalize();
         }
 
-        private async Task<bool> HandleMessageWithRetries(string messageId, Dictionary<string, string> headers, byte[] body, TransportTransaction transportTransaction, int processingAttempt)
+        private bool HandleMessageWithRetries(string messageId, Dictionary<string, string> headers, byte[] body, TransportTransaction transportTransaction, int processingAttempt)
         {
             try
             {
@@ -219,18 +189,18 @@ namespace NServiceBus.Transport.Email
                     receiveCancellationTokenSource,
                     new ContextBag());
 
-                await _pipeline(pushContext).ConfigureAwait(false);
+                _pipeline(pushContext);
 
                 return !receiveCancellationTokenSource.IsCancellationRequested;
             }
             catch (Exception e)
             {
                 var errorContext = new ErrorContext(e, headers, messageId, body, transportTransaction, processingAttempt);
-                var errorHandlingResult = await _onError(errorContext).ConfigureAwait(false);
-
-                if (errorHandlingResult == ErrorHandleResult.RetryRequired)
+                var errorHandlingResult = _onError(errorContext);
+                errorHandlingResult.Wait();
+                if (errorHandlingResult.Result == ErrorHandleResult.RetryRequired)
                 {
-                    return await HandleMessageWithRetries(messageId, headers, body, transportTransaction, ++processingAttempt).ConfigureAwait(false);
+                    return HandleMessageWithRetries(messageId, headers, body, transportTransaction, ++processingAttempt);
                 }
 
                 return true;

@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
+using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Features;
+using NServiceBus.Transport.Email.Demo.Shared;
+using NServiceBus.Transport.Email.Utils;
 
 namespace NServiceBus.Transport.Email.Demo.Receiver
 {
@@ -15,15 +18,22 @@ namespace NServiceBus.Transport.Email.Demo.Receiver
         {
             Console.Title = "NServiceBus.Transport.Email.Demo.Receiver";
 
-            var endpointConfiguration = new EndpointConfiguration("ReceiverEndpointName");
-            endpointConfiguration.UseTransport<EmailTransport>();
+            var demoSettings = ConsoleHelper.LoadDemoSettings();
+
+            var endpointConfiguration = new EndpointConfiguration("NSB-Receiver-Endpoint");
+            endpointConfiguration.UseSerialization<NewtonsoftSerializer>();
+            endpointConfiguration.UseTransport<EmailTransport>()
+                .GetSettings()
+                .ConfigureEmailTransport(demoSettings);
             endpointConfiguration.UsePersistence<InMemoryPersistence>();
             endpointConfiguration.DisableFeature<TimeoutManager>();
 
-            var endpointInstance = await Endpoint.Start(endpointConfiguration).ConfigureAwait(false);
+            var endpointInstance = await Endpoint.Start(endpointConfiguration);
+            Console.WriteLine("Endpoint NSB-Receiver-Endpoint ready");
             Console.WriteLine("Press any key to exit");
             Console.ReadKey();
-            await endpointInstance.Stop().ConfigureAwait(false);
+            await endpointInstance.Stop();
         }
     }
+
 }

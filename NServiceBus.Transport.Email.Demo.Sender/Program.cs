@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Configuration;
 using System.Threading.Tasks;
+using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Features;
 using NServiceBus.Transport.Email.Demo.Shared;
+using NServiceBus.Transport.Email.Utils;
 
 namespace NServiceBus.Transport.Email.Demo.Sender
 {
@@ -16,21 +18,26 @@ namespace NServiceBus.Transport.Email.Demo.Sender
         private static async Task AsyncMain()
         {
             Console.Title = "NServiceBus.Transport.Email.Demo.Sender";
-            var endpointConfiguration = new EndpointConfiguration("SenderEndpointName");
-            endpointConfiguration.UseTransport<EmailTransport>();
-
+            
+            var demoSettings = ConsoleHelper.LoadDemoSettings();
+            
+            var endpointConfiguration = new EndpointConfiguration("NSB-Sender-Endpoint");
+            endpointConfiguration.UseTransport<EmailTransport>().GetSettings().ConfigureEmailTransport(demoSettings);
             endpointConfiguration.UsePersistence<InMemoryPersistence>();
             endpointConfiguration.DisableFeature<TimeoutManager>();
-
-            var endpointInstance = await Endpoint.Start(endpointConfiguration).ConfigureAwait(false);
+            endpointConfiguration.UseSerialization<NewtonsoftSerializer>();
+            
+            var endpointInstance = await Endpoint.Start(endpointConfiguration);
 
             var messageA = new MessageA();
-            var receiverEndpointName = ConfigurationManager.AppSettings["ReceiverEndpointName"];
-            await endpointInstance.Send(receiverEndpointName, messageA).ConfigureAwait(false);
-
+            var receiverEndpointName = $"NSB-Receiver-Endpoint@{demoSettings.ImapUser}";
+            
+            await endpointInstance.Send(receiverEndpointName, messageA);
+            
+            
             Console.WriteLine("MessageA sent to endpoint {0}. Press any key to exit", receiverEndpointName);
             Console.ReadKey();
-            await endpointInstance.Stop().ConfigureAwait(false);
+            await endpointInstance.Stop();
         }
     }
 }

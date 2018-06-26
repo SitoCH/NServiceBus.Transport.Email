@@ -3,20 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26430.16
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Transport.Email", "NServiceBus.Transport.Email\NServiceBus.Transport.Email.csproj", "{2A1A0C6E-ADF5-457F-9B11-9AA7993759EA}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo", "Demo", "{DEC0CDB9-B94D-4D70-ADFC-F83D78CDFFAD}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Sender", "NServiceBus.Transport.Email.Demo.Sender\NServiceBus.Transport.Email.Demo.Sender.csproj", "{D5DAA1AE-129C-477D-AB0E-27904D6C8E5E}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Shared", "NServiceBus.Transport.Email.Demo.Shared\NServiceBus.Transport.Email.Demo.Shared.csproj", "{26C5C7B5-314C-41CA-A759-C89A3CAE1C40}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{12F28A86-D6E7-412B-AFD7-E087968FA318}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Receiver", "NServiceBus.Transport.Email.Demo.Receiver\NServiceBus.Transport.Email.Demo.Receiver.csproj", "{E73E28FA-14DA-4FBD-9F8B-1B8622536333}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email", "NServiceBus.Transport.Email\NServiceBus.Transport.Email.csproj", "{5D04DE94-9BAE-474E-95AD-D228FBA51B9E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Receiver", "NServiceBus.Transport.Email.Demo.Receiver\NServiceBus.Transport.Email.Demo.Receiver.csproj", "{8F1B21F5-0F08-4331-AFF6-9EAD614CCCE6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Shared", "NServiceBus.Transport.Email.Demo.Shared\NServiceBus.Transport.Email.Demo.Shared.csproj", "{A1898D80-2B6A-4CD4-96FB-E2668B1DC679}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Sender", "NServiceBus.Transport.Email.Demo.Sender\NServiceBus.Transport.Email.Demo.Sender.csproj", "{571B1E69-841B-49AD-8B4C-94274DCDD268}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,29 +22,26 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2A1A0C6E-ADF5-457F-9B11-9AA7993759EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2A1A0C6E-ADF5-457F-9B11-9AA7993759EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2A1A0C6E-ADF5-457F-9B11-9AA7993759EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2A1A0C6E-ADF5-457F-9B11-9AA7993759EA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D5DAA1AE-129C-477D-AB0E-27904D6C8E5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D5DAA1AE-129C-477D-AB0E-27904D6C8E5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D5DAA1AE-129C-477D-AB0E-27904D6C8E5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D5DAA1AE-129C-477D-AB0E-27904D6C8E5E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{26C5C7B5-314C-41CA-A759-C89A3CAE1C40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{26C5C7B5-314C-41CA-A759-C89A3CAE1C40}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{26C5C7B5-314C-41CA-A759-C89A3CAE1C40}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{26C5C7B5-314C-41CA-A759-C89A3CAE1C40}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E73E28FA-14DA-4FBD-9F8B-1B8622536333}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E73E28FA-14DA-4FBD-9F8B-1B8622536333}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E73E28FA-14DA-4FBD-9F8B-1B8622536333}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E73E28FA-14DA-4FBD-9F8B-1B8622536333}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D04DE94-9BAE-474E-95AD-D228FBA51B9E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D04DE94-9BAE-474E-95AD-D228FBA51B9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D04DE94-9BAE-474E-95AD-D228FBA51B9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D04DE94-9BAE-474E-95AD-D228FBA51B9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F1B21F5-0F08-4331-AFF6-9EAD614CCCE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F1B21F5-0F08-4331-AFF6-9EAD614CCCE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F1B21F5-0F08-4331-AFF6-9EAD614CCCE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F1B21F5-0F08-4331-AFF6-9EAD614CCCE6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1898D80-2B6A-4CD4-96FB-E2668B1DC679}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1898D80-2B6A-4CD4-96FB-E2668B1DC679}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1898D80-2B6A-4CD4-96FB-E2668B1DC679}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1898D80-2B6A-4CD4-96FB-E2668B1DC679}.Release|Any CPU.Build.0 = Release|Any CPU
+		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{D5DAA1AE-129C-477D-AB0E-27904D6C8E5E} = {DEC0CDB9-B94D-4D70-ADFC-F83D78CDFFAD}
-		{26C5C7B5-314C-41CA-A759-C89A3CAE1C40} = {DEC0CDB9-B94D-4D70-ADFC-F83D78CDFFAD}
-		{E73E28FA-14DA-4FBD-9F8B-1B8622536333} = {DEC0CDB9-B94D-4D70-ADFC-F83D78CDFFAD}
 	EndGlobalSection
 EndGlobal

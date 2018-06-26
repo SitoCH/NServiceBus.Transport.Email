@@ -1,3 +1,0 @@
-<appSettings>
-  <add key="ReceiverEndpointName" value="EndpointName@email@address.com"/>
-</appSettings>
