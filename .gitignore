@@ -266,3 +266,4 @@ __pycache__/
 *.pyc
 
 demo-settings.json
+tools/

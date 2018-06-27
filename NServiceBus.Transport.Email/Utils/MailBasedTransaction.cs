@@ -51,7 +51,7 @@ namespace NServiceBus.Transport.Email.Utils
             throw new Exception($"Pending message not found for id {_messageId}.");
         }
 
-        public void Finalize()
+        public void End()
         {
             var pendingFolder = GetPendingFolder();
             pendingFolder.Open(FolderAccess.ReadWrite);

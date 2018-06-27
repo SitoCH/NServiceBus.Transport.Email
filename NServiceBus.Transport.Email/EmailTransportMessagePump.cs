@@ -161,7 +161,7 @@ namespace NServiceBus.Transport.Email
             }
 
             var ms = new MemoryStream();
-            ((MimePart) message.Attachments.First()).ContentObject.DecodeTo(ms);
+            ((MimePart) message.Attachments.First()).Content.DecodeTo(ms);
             var body = ms.ToArray();
             var transportTransaction = new TransportTransaction();
             transportTransaction.Set(transaction);
@@ -173,7 +173,7 @@ namespace NServiceBus.Transport.Email
                 transaction.Commit();
             }
 
-            transaction.Finalize();
+            transaction.End();
         }
 
         private bool HandleMessageWithRetries(string messageId, Dictionary<string, string> headers, byte[] body, TransportTransaction transportTransaction, int processingAttempt)
