@@ -15,16 +15,24 @@ namespace NServiceBus.Transport.Email.Utils
             message.From.Add(new MailboxAddress(mailFrom));
             message.To.Add(new MailboxAddress(to));
             var messageBody = new TextPart("plain") {Text = body};
-            var messageAttachment = new MimePart("application", "octet-stream")
-            {
-                Content = new MimeContent(new MemoryStream(attachment)),
-                ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
-                ContentTransferEncoding = ContentEncoding.Base64,
-                FileName = "native-message"
-            };
 
-            var multipart = new Multipart("mixed") {messageBody, messageAttachment};
-            message.Body = multipart;
+
+            if (attachment.Length > 0)
+            {
+                var messageAttachment = new MimePart("application", "octet-stream")
+                {
+                    Content = new MimeContent(new MemoryStream(attachment)),
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                    ContentTransferEncoding = ContentEncoding.Base64,
+                    FileName = "native-message"
+                };
+
+                message.Body = new Multipart("mixed") {messageBody, messageAttachment};
+            }
+            else
+            {
+                message.Body = new Multipart("mixed") {messageBody};
+            }
 
             using (var client = new SmtpClient())
             {

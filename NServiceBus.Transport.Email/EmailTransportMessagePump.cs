@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -20,14 +18,15 @@ namespace NServiceBus.Transport.Email
     internal class EmailTransportMessagePump : IPushMessages
     {
         private static readonly ILog _log = LogManager.GetLogger<EmailTransportMessagePump>();
-        private static bool _started;
 
+        private bool _started;
         private readonly string _endpointName;
         private readonly SettingsHolder _settings;
         private CancellationTokenSource _timeoutTokenSource;
         private CancellationTokenSource _cancellationTokenSource;
         private Func<ErrorContext, Task<ErrorHandleResult>> _onError;
         private Func<MessageContext, Task> _pipeline;
+        private Task _messagePumpTask;
 
         private bool _purgeOnStartup;
 
@@ -51,27 +50,28 @@ namespace NServiceBus.Transport.Email
                 return;
             _started = true;
 
-            Task.Factory.StartNew(() =>
+            _messagePumpTask = Task.Factory.StartNew(ProcessMessages,
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default).Unwrap();
+        }
+
+        private async Task ProcessMessages()
+        {
+            try
             {
                 using (var client = _settings.GetImapClient())
                 {
-                    ImapUtils.InitMailboxes(client, _settings.EndpointName());
-
-                    client.Inbox.Open(FolderAccess.ReadWrite);
-
+                    ImapUtils.InitMailboxes(client, _endpointName);
 
                     if (_purgeOnStartup)
                     {
                         ImapUtils.PurgeMailboxes(client, _endpointName);
                     }
 
+                    client.Inbox.Open(FolderAccess.ReadWrite);
+
                     var query = SearchQuery.SubjectContains($"NSB-MSG-{_endpointName}-");
-                    // Process any messages that arrived when the endpoint was unactive
-                    foreach (var m in client.Inbox.Search(query))
-                    {
-                        _log.Info($"Found pre-existing message with UID: {m}.");
-                        ProcessMessageWithTransaction(client, m);
-                    }
 
                     // Listen to new messages
                     void CheckForNewMessages(object o, EventArgs args)
@@ -91,21 +91,26 @@ namespace NServiceBus.Transport.Email
                         {
                             try
                             {
+                                foreach (var m in client.Inbox.Search(query))
+                                {
+                                    _log.Debug($"Processing message with UID: {m}.");
+                                    await ProcessMessageWithTransaction(client, m);
+                                }
+
                                 if (client.Capabilities.HasFlag(ImapCapabilities.Idle))
                                 {
-                                    _log.Info("Waiting for IDLE from IMAP server.");
-                                    client.Idle(_timeoutTokenSource.Token, _cancellationTokenSource.Token);
+                                    _log.Debug("Waiting for IDLE from IMAP server.");
+                                    await client.IdleAsync(_timeoutTokenSource.Token, _cancellationTokenSource.Token);
                                 }
                                 else
                                 {
-                                    _log.Info("Waiting for new messages...");
+                                    _log.Debug("Waiting for new messages...");
                                     client.NoOp(_cancellationTokenSource.Token);
                                     WaitHandle.WaitAny(new[] {_timeoutTokenSource.Token.WaitHandle, _cancellationTokenSource.Token.WaitHandle});
                                 }
                             }
                             catch (OperationCanceledException)
                             {
-                                break;
                             }
                             catch (ImapProtocolException)
                             {
@@ -115,68 +120,93 @@ namespace NServiceBus.Transport.Email
                             {
                                 break;
                             }
-
-                            foreach (var m in client.Inbox.Search(query))
-                            {
-                                _log.Info($"Processing message with UID: {m}.");
-                                ProcessMessageWithTransaction(client, m);
-                            }
                         }
                     }
                 }
-            });
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex.Message, ex);
+                throw;
+            }
         }
 
         public Task Stop()
         {
             try
             {
-                _cancellationTokenSource.Cancel();
-                _cancellationTokenSource.Dispose();
+                if (_cancellationTokenSource != null)
+                {
+                    _cancellationTokenSource.Cancel();
+                }
             }
             catch (OperationCanceledException)
             {
             }
+            catch (Exception ex)
+            {
+                _log.Error(ex.Message, ex);
+                throw;
+            }
 
-            return Task.CompletedTask;
+            return _messagePumpTask;
         }
 
-        private void ProcessMessageWithTransaction(ImapClient client, UniqueId messageId)
+        private async Task ProcessMessageWithTransaction(ImapClient client, UniqueId messageId)
         {
-            var transaction = new MailBasedTransaction(client, _endpointName);
-            var pair = transaction.BeginTransaction(messageId);
-            var messageNativeId = pair.Item1;
-            var message = pair.Item2;
-
-            var headers = HeaderSerializer.Deserialize(message.TextBody);
-
-            if (headers.TryGetValue(Headers.TimeToBeReceived, out string ttbrString))
+            using (var transaction = new MailBasedTransaction(client, _endpointName))
             {
-                var ttbr = TimeSpan.Parse(ttbrString);
-                var sentTime = message.Date;
-                if (sentTime + ttbr < DateTime.UtcNow)
+                try
                 {
-                    return;
+                    var pair = transaction.BeginTransaction(messageId);
+                    var messageNativeId = pair.Item1;
+                    var message = pair.Item2;
+
+                    var headers = HeaderSerializer.Deserialize(message.TextBody);
+
+                    if (headers.TryGetValue(Headers.TimeToBeReceived, out string ttbrString))
+                    {
+                        var ttbr = TimeSpan.Parse(ttbrString);
+                        var sentTime = message.Date;
+                        if (sentTime + ttbr < DateTime.UtcNow)
+                        {
+                            return;
+                        }
+                    }
+
+                    var body = new byte[0];
+                    if (message.Attachments.Any())
+                    {
+                        var ms = new MemoryStream();
+                        ((MimePart) message.Attachments.First()).Content.DecodeTo(ms);
+                        body = ms.ToArray();
+                    }
+
+                    var transportTransaction = new TransportTransaction();
+
+                    transportTransaction.Set(transaction);
+
+                    var shouldCommit = await HandleMessageWithRetries(messageNativeId, headers, body, transportTransaction, 1, null);
+                    if (shouldCommit)
+                    {
+                        transaction.Commit();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Error(ex.Message, ex);
+                    transaction.Abort();
+                    throw;
                 }
             }
-
-            var ms = new MemoryStream();
-            ((MimePart) message.Attachments.First()).Content.DecodeTo(ms);
-            var body = ms.ToArray();
-            var transportTransaction = new TransportTransaction();
-            transportTransaction.Set(transaction);
-
-            var shouldCommit = HandleMessageWithRetries(messageNativeId, headers, body, transportTransaction, 1);
-
-            if (shouldCommit)
-            {
-                transaction.Commit();
-            }
-
-            transaction.End();
         }
 
-        private bool HandleMessageWithRetries(string messageId, Dictionary<string, string> headers, byte[] body, TransportTransaction transportTransaction, int processingAttempt)
+        private async Task<bool> HandleMessageWithRetries(string messageId,
+            Dictionary<string, string> headers,
+            byte[] body,
+            TransportTransaction transportTransaction,
+            int processingAttempt,
+            Exception originalException)
         {
             try
             {
@@ -189,21 +219,27 @@ namespace NServiceBus.Transport.Email
                     receiveCancellationTokenSource,
                     new ContextBag());
 
-                _pipeline(pushContext);
+                await _pipeline(pushContext);
 
                 return !receiveCancellationTokenSource.IsCancellationRequested;
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                var errorContext = new ErrorContext(e, headers, messageId, body, transportTransaction, processingAttempt);
-                var errorHandlingResult = _onError(errorContext);
-                errorHandlingResult.Wait();
-                if (errorHandlingResult.Result == ErrorHandleResult.RetryRequired)
+                try
                 {
-                    return HandleMessageWithRetries(messageId, headers, body, transportTransaction, ++processingAttempt);
-                }
+                    var errorContext = new ErrorContext(ex, headers, messageId, body, transportTransaction, processingAttempt);
+                    var errorHandlingResult = await _onError(errorContext);
+                    if (errorHandlingResult == ErrorHandleResult.RetryRequired)
+                    {
+                        return await HandleMessageWithRetries(messageId, headers, body, transportTransaction, ++processingAttempt, originalException ?? ex);
+                    }
 
-                return true;
+                    return true;
+                }
+                catch (Exception)
+                {
+                    throw originalException ?? ex;
+                }
             }
         }
     }

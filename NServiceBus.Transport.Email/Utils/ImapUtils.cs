@@ -1,4 +1,5 @@
-﻿using System.Configuration;
+﻿using System.Collections.Generic;
+using System.Configuration;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,9 +19,21 @@ namespace NServiceBus.Transport.Email.Utils
             return $"NSB.{endpointName}.error";
         }
 
-        public static string GetPendingMailboxName(string endpointName)
+        public static IMailFolder GetErrorMailbox(ImapClient client, string endpointName)
+        {
+            var toplevel = client.GetFolder(client.PersonalNamespaces[0].Path);
+            return toplevel.GetSubfolder(GetErrorMailboxName(endpointName));
+        }
+
+        private static string GetPendingMailboxName(string endpointName)
         {
             return $"NSB.{endpointName}.pending";
+        }
+
+        public static IMailFolder GetPendingMailbox(ImapClient client, string endpointName)
+        {
+            var toplevel = client.GetFolder(client.PersonalNamespaces[0].Path);
+            return toplevel.GetSubfolder(GetPendingMailboxName(endpointName));
         }
 
         public static void InitMailboxes(ImapClient client, string endpointName)
@@ -43,15 +56,33 @@ namespace NServiceBus.Transport.Email.Utils
             }
         }
 
+
         public static void PurgeMailboxes(ImapClient client, string endpointName)
         {
-            var toplevel = client.GetFolder(client.PersonalNamespaces[0].Path);
-            var pendingMailbox = toplevel.GetSubfolder(GetPendingMailboxName(endpointName));
-            if (pendingMailbox.Exists)
+            var pendingMailbox = GetPendingMailbox(client, endpointName);
+            if (!pendingMailbox.Exists)
+                return;
+
+            pendingMailbox.Open(FolderAccess.ReadWrite);
+            var uids = pendingMailbox.Search(SearchQuery.All);
+            if (uids.Any())
             {
-                var uids = pendingMailbox.Search(SearchQuery.All);
-                pendingMailbox.AddFlags(uids, MessageFlags.Deleted, true);
-                pendingMailbox.Expunge();
+                DeleteMessages(client, pendingMailbox, uids);
+            }
+
+            pendingMailbox.Close();
+        }
+
+        public static void DeleteMessages(ImapClient client, IMailFolder mailbox, IList<UniqueId> uids)
+        {
+            if (client.Capabilities.HasFlag(ImapCapabilities.UidPlus))
+            {
+                mailbox.Expunge(uids);
+            }
+            else
+            {
+                mailbox.AddFlags(uids, MessageFlags.Deleted, true);
+                mailbox.Expunge();
             }
         }
     }

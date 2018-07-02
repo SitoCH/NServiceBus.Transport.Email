@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Demo.Sender", "NServiceBus.Transport.Email.Demo.Sender\NServiceBus.Transport.Email.Demo.Sender.csproj", "{571B1E69-841B-49AD-8B4C-94274DCDD268}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NServiceBus.Transport.Email.Tests", "NServiceBus.Transport.Email.Tests\NServiceBus.Transport.Email.Tests.csproj", "{EAF9250F-B51C-4AFC-B5DF-E613B21D53EF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,6 +44,10 @@ Global
 		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{571B1E69-841B-49AD-8B4C-94274DCDD268}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EAF9250F-B51C-4AFC-B5DF-E613B21D53EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EAF9250F-B51C-4AFC-B5DF-E613B21D53EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EAF9250F-B51C-4AFC-B5DF-E613B21D53EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EAF9250F-B51C-4AFC-B5DF-E613B21D53EF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
