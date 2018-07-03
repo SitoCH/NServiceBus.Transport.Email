@@ -225,20 +225,21 @@ namespace NServiceBus.Transport.Email
             }
             catch (Exception ex)
             {
+                var exceptionToThrow = originalException ?? ex;
                 try
                 {
-                    var errorContext = new ErrorContext(ex, headers, messageId, body, transportTransaction, processingAttempt);
+                    var errorContext = new ErrorContext(exceptionToThrow, headers, messageId, body, transportTransaction, processingAttempt);
                     var errorHandlingResult = await _onError(errorContext);
                     if (errorHandlingResult == ErrorHandleResult.RetryRequired)
                     {
-                        return await HandleMessageWithRetries(messageId, headers, body, transportTransaction, ++processingAttempt, originalException ?? ex);
+                        return await HandleMessageWithRetries(messageId, headers, body, transportTransaction, ++processingAttempt, exceptionToThrow);
                     }
 
                     return true;
                 }
                 catch (Exception)
                 {
-                    throw originalException ?? ex;
+                    throw exceptionToThrow;
                 }
             }
         }
