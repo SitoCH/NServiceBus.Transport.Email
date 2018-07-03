@@ -196,7 +196,6 @@ namespace NServiceBus.Transport.Email
                 {
                     _log.Error(ex.Message, ex);
                     transaction.Abort();
-                    throw;
                 }
             }
         }
