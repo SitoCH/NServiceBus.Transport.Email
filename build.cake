@@ -12,6 +12,7 @@ var configuration = Argument("configuration", "Release");
 
 // Define directories.
 var solutionPath = "NServiceBus.Transport.Email.sln";
+var testPath = "NServiceBus.Transport.Email.Tests/NServiceBus.Transport.Email.Tests.csproj";
 
 //////////////////////////////////////////////////////////////////////
 // TASKS
@@ -28,7 +29,7 @@ Task("Clean")
     DotNetCoreClean(solutionPath, cleanSettings);
 });
 
-Task("Restore-NuGet-Packages")
+Task("RestoreNuGetPackages")
 .IsDependentOn("Clean")
 .Does(() =>
 {
@@ -36,7 +37,7 @@ Task("Restore-NuGet-Packages")
 });
 
 Task("Build")
-.IsDependentOn("Restore-NuGet-Packages")
+.IsDependentOn("RestoreNuGetPackages")
 .Does(() =>
 {
 
@@ -48,12 +49,25 @@ Task("Build")
     DotNetCoreBuild(solutionPath, buildSettings);
 });
 
+Task("Test")
+.IsDependentOn("RestoreNuGetPackages")
+.Does(() =>
+{
+
+    var testSettings = new DotNetCoreTestSettings {
+        Configuration = configuration,
+        NoRestore = true
+    };
+    
+    DotNetCoreTest(testPath, testSettings);
+});
+
 //////////////////////////////////////////////////////////////////////
 // TASK TARGETS
 //////////////////////////////////////////////////////////////////////
 
 Task("Default")
-.IsDependentOn("Build");
+.IsDependentOn("Test");
 
 //////////////////////////////////////////////////////////////////////
 // EXECUTION
