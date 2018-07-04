@@ -12,7 +12,6 @@ var configuration = Argument("configuration", "Release");
 
 // Define directories.
 var solutionPath = "NServiceBus.Transport.Email.sln";
-var testPath = "NServiceBus.Transport.Email.Tests/NServiceBus.Transport.Email.Tests.csproj";
 
 //////////////////////////////////////////////////////////////////////
 // TASKS
@@ -60,7 +59,18 @@ Task("Test")
         Logger = "trx;LogFileName=TestResults.trx"
     };
     
-    DotNetCoreTest(testPath, testSettings);
+    DotNetCoreTest("NServiceBus.Transport.Email.Tests/NServiceBus.Transport.Email.Tests.csproj", testSettings);
+
+});
+
+Task("PublishTestResults")
+.IsDependentOn("Test")
+.WithCriteria(EnvironmentVariable("APPVEYOR_JOB_ID") != null)
+.Does(() =>
+{
+    var url = $"https://ci.appveyor.com/api/testresults/mstest/{EnvironmentVariable("APPVEYOR_JOB_ID")}";
+    UploadFile(url, @"NServiceBus.Transport.Email.Tests/TestResults/TestResults.trx");
+    
 });
 
 //////////////////////////////////////////////////////////////////////
@@ -68,7 +78,7 @@ Task("Test")
 //////////////////////////////////////////////////////////////////////
 
 Task("Default")
-.IsDependentOn("Test");
+.IsDependentOn("PublishTestResults");
 
 //////////////////////////////////////////////////////////////////////
 // EXECUTION
