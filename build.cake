@@ -47,7 +47,7 @@ Task("Build")
 });
 
 Task("Test")
-.IsDependentOn("RestoreNuGetPackages")
+.IsDependentOn("Build")
 .Does(() =>
 {
     var testSettings = new DotNetCoreTestSettings {
