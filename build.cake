@@ -56,7 +56,8 @@ Task("Test")
 
     var testSettings = new DotNetCoreTestSettings {
         Configuration = configuration,
-        NoRestore = true
+        NoRestore = true,
+        Logger = "trx;LogFileName=TestResults.trx"
     };
     
     DotNetCoreTest(testPath, testSettings);
