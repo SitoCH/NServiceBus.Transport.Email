@@ -20,7 +20,6 @@ var solutionPath = "NServiceBus.Transport.Email.sln";
 Task("Clean")
 .Does(() =>
 {   
-
     var cleanSettings = new DotNetCoreCleanSettings {
         Configuration = configuration
     };
@@ -39,7 +38,6 @@ Task("Build")
 .IsDependentOn("RestoreNuGetPackages")
 .Does(() =>
 {
-
     var buildSettings = new DotNetCoreBuildSettings {
         Configuration = configuration,
         NoRestore = true
@@ -52,15 +50,14 @@ Task("Test")
 .IsDependentOn("RestoreNuGetPackages")
 .Does(() =>
 {
-
     var testSettings = new DotNetCoreTestSettings {
         Configuration = configuration,
         NoRestore = true,
+        NoBuild = true,
         Logger = "trx;LogFileName=TestResults.trx"
     };
     
     DotNetCoreTest("NServiceBus.Transport.Email.Tests/NServiceBus.Transport.Email.Tests.csproj", testSettings);
-
 });
 
 Task("PublishTestResults")
@@ -69,8 +66,7 @@ Task("PublishTestResults")
 .Does(() =>
 {
     var url = $"https://ci.appveyor.com/api/testresults/mstest/{EnvironmentVariable("APPVEYOR_JOB_ID")}";
-    UploadFile(url, @"NServiceBus.Transport.Email.Tests/TestResults/TestResults.trx");
-    
+    UploadFile(url, @"NServiceBus.Transport.Email.Tests/TestResults/TestResults.trx");  
 });
 
 //////////////////////////////////////////////////////////////////////
