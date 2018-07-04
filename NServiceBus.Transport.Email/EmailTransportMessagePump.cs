@@ -30,7 +30,7 @@ namespace NServiceBus.Transport.Email
         private Task _messagePumpTask;
         private bool _purgeOnStartup;
         private CriticalError _criticalError;
-        private ConcurrentDictionary<string, int> _currentRetries = new ConcurrentDictionary<string, int>();
+        private readonly ConcurrentDictionary<string, int> _currentRetries = new ConcurrentDictionary<string, int>();
 
         public EmailTransportMessagePump(SettingsHolder settings)
         {
@@ -221,8 +221,7 @@ namespace NServiceBus.Transport.Email
                 {
                     try
                     {
-                        _currentRetries.AddOrUpdate(messageId, i, (k, v) => i);
-                        _log.Info($"Attempt {i}");
+                        _currentRetries.AddOrUpdate(messageId, i + 1, (k, v) => i + 1);
                         var errorContext = new ErrorContext(exception, headers, messageId, body, transportTransaction, i + 1);
                         var actionToTake = await _onError(errorContext);
                         if (actionToTake == ErrorHandleResult.RetryRequired)
