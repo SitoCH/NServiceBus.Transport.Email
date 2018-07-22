@@ -267,3 +267,4 @@ __pycache__/
 
 demo-settings.json
 tools/
+/NServiceBus.Transport.Email.Tests/coverage.xml

@@ -1,4 +1,7 @@
 #tool nuget:?package=NUnit.ConsoleRunner&version=3.4.0
+#addin Cake.Coveralls
+#tool coveralls.io
+
 //////////////////////////////////////////////////////////////////////
 // ARGUMENTS
 //////////////////////////////////////////////////////////////////////
@@ -40,7 +43,8 @@ Task("Build")
 {
     var buildSettings = new DotNetCoreBuildSettings {
         Configuration = configuration,
-        NoRestore = true
+        NoRestore = true,
+        ArgumentCustomization = arg => arg.AppendSwitch("/p:DebugType","=","Full")
     };
     
     DotNetCoreBuild(solutionPath, buildSettings);
@@ -54,10 +58,12 @@ Task("Test")
         Configuration = configuration,
         NoRestore = true,
         NoBuild = true,
-        Logger = "trx;LogFileName=TestResults.trx"
+        Logger = "trx;LogFileName=TestResults.trx",
+        ArgumentCustomization = args => args.Append("/p:AltCover=true")
     };
     
     DotNetCoreTest("NServiceBus.Transport.Email.Tests/NServiceBus.Transport.Email.Tests.csproj", testSettings);
+    
 });
 
 Task("PublishTestResults")
@@ -65,8 +71,16 @@ Task("PublishTestResults")
 .WithCriteria(EnvironmentVariable("APPVEYOR_JOB_ID") != null)
 .Does(() =>
 {
+    // Upload tests results
     var url = $"https://ci.appveyor.com/api/testresults/mstest/{EnvironmentVariable("APPVEYOR_JOB_ID")}";
     UploadFile(url, @"NServiceBus.Transport.Email.Tests/TestResults/TestResults.trx");  
+    
+    // Upload code coverage
+    CoverallsIo("coverage.xml", new CoverallsIoSettings
+        {
+            RepoToken = EnvironmentVariable("APPVEYOR_COVERALLS_TOKEN")
+        });
+
 });
 
 //////////////////////////////////////////////////////////////////////
