@@ -78,8 +78,7 @@ Task("PublishTestResults")
     // Upload code coverage
     CoverallsIo("NServiceBus.Transport.Email.Tests/coverage.xml", new CoverallsIoSettings
         {
-            RepoToken = EnvironmentVariable("APPVEYOR_COVERALLS_TOKEN"),
-            FullSources = true
+            RepoToken = EnvironmentVariable("APPVEYOR_COVERALLS_TOKEN")
         });
 
 });
