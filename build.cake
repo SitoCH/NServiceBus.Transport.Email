@@ -59,7 +59,7 @@ Task("Test")
         NoRestore = true,
         NoBuild = true,
         Logger = "trx;LogFileName=TestResults.trx",
-        ArgumentCustomization = args => args.Append("/p:AltCover=true")
+        ArgumentCustomization = args => args.Append("/p:AltCover=true").Append("/p:AltCoverAssemblyExcludeFilter=\"NUnit3.TestAdapter\"")
     };
     
     DotNetCoreTest("NServiceBus.Transport.Email.Tests/NServiceBus.Transport.Email.Tests.csproj", testSettings);
@@ -78,7 +78,8 @@ Task("PublishTestResults")
     // Upload code coverage
     CoverallsIo("NServiceBus.Transport.Email.Tests/coverage.xml", new CoverallsIoSettings
         {
-            RepoToken = EnvironmentVariable("APPVEYOR_COVERALLS_TOKEN")
+            RepoToken = EnvironmentVariable("APPVEYOR_COVERALLS_TOKEN"),
+            FullSources = true
         });
 
 });
