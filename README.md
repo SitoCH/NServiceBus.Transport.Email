@@ -1,7 +1,7 @@
 # NServiceBus.Transport.Email
 
 [![Build status](https://ci.appveyor.com/api/projects/status/s13ig5w3kbf6pih2/branch/master?svg=true)](https://ci.appveyor.com/project/SitoCH/nservicebus-transport-email/branch/master)
-
+[![Coverage Status](https://coveralls.io/repos/github/SitoCH/NServiceBus.Transport.Email/badge.svg)](https://coveralls.io/github/SitoCH/NServiceBus.Transport.Email)
 
 ## About
 
