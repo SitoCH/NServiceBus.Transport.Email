@@ -8,7 +8,7 @@
     <ProjectReference Include="..\NServiceBus.Transport.Email\NServiceBus.Transport.Email.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="NServiceBus" Version="7.1.6" />
+    <PackageReference Include="NServiceBus" Version="7.1.7" />
     <PackageReference Include="NServiceBus.Newtonsoft.Json" Version="2.2.0" />
   </ItemGroup>
 </Project>
